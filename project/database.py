@@ -1,6 +1,3 @@
-"""
-database.py — SQLite persistence layer for CNB exchange rates.
-"""
 import sqlite3
 import logging
 from contextlib import contextmanager
@@ -11,13 +8,14 @@ logger = logging.getLogger(__name__)
 
 def get_connection(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
+    conn.row_factory = sqlite3.Row  # доступ к колонкам по имени
+    conn.execute("PRAGMA journal_mode=WAL")  # WAL позволяет читать БД во время записи
     return conn
 
 
 @contextmanager
 def db_session(db_path: str):
+    # контекстный менеджер: commit при успехе, rollback при ошибке
     conn = get_connection(db_path)
     try:
         yield conn
@@ -30,7 +28,7 @@ def db_session(db_path: str):
 
 
 def init_db(db_path: str) -> None:
-    """Create tables if they do not exist. Parent directory is created if absent."""
+    # создаём директорию для файла БД, если её нет (актуально при первом запуске в Docker)
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     with db_session(db_path) as conn:
         conn.execute("""
@@ -38,12 +36,13 @@ def init_db(db_path: str) -> None:
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 date        TEXT    NOT NULL,
                 currency    TEXT    NOT NULL,
-                amount      INTEGER NOT NULL,
+                amount      INTEGER NOT NULL,  -- за сколько единиц валюты указан курс
                 rate        REAL    NOT NULL,
                 created_at  TEXT    DEFAULT (datetime('now')),
-                UNIQUE (date, currency)
+                UNIQUE (date, currency)         -- один курс на валюту в день
             )
         """)
+        # индекс ускоряет выборки по дате и валюте в отчётах
         conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_date_currency
             ON exchange_rates (date, currency)
@@ -52,11 +51,7 @@ def init_db(db_path: str) -> None:
 
 
 def upsert_rates(db_path: str, rows: list[dict]) -> int:
-    """
-    Insert or replace rate rows.
-    Each dict must have keys: date, currency, amount, rate
-    Returns number of rows affected.
-    """
+    # INSERT с обновлением при конфликте — повторная синхронизация не создаёт дублей
     if not rows:
         return 0
     with db_session(db_path) as conn:
@@ -74,10 +69,7 @@ def upsert_rates(db_path: str, rows: list[dict]) -> int:
 
 
 def get_report(db_path: str, start_date: str, end_date: str, currencies: list[str]) -> list[dict]:
-    """
-    Return min/max/avg for each requested currency in [start_date, end_date].
-    Rates are normalised to 1 unit (rate / amount).
-    """
+    # делим rate на amount, чтобы получить курс за 1 единицу (JPY, HUF публикуются за 100)
     placeholders = ",".join("?" * len(currencies))
     query = f"""
         SELECT
