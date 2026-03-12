@@ -1,0 +1,35 @@
+# CNB Exchange Rate Sync Configuration
+
+# Scheduler settings
+scheduler:
+  # Cron expression: "minute hour day month day_of_week"
+  # Default: every day at 00:01
+  cron: "1 0 * * *"
+  # Alternatively, use interval in seconds (comment out cron to use this)
+  # interval_seconds: 86400
+
+
+# List of currencies to synchronize
+currencies:
+  - USD
+  - EUR
+  - GBP
+  - JPY
+  - CHF
+  - RUB
+
+# Historical sync period (used when running manual historical sync)
+historical_sync:
+  start_date: "2024-01-01"
+  end_date: "2024-12-31"
+
+# Database
+# In Docker the /app/data directory is a named volume (persistent).
+# For local development without Docker, change to just "cnb_rates.db".
+database:
+  path: "data/cnb_rates.db"
+
+# CNB API base URLs
+cnb:
+  daily_url: "https://www.cnb.cz/en/financial_markets/foreign_exchange_market/exchange_rate_fixing/daily.txt"
+  year_url: "https://www.cnb.cz/en/financial_markets/foreign_exchange_market/exchange_rate_fixing/year.txt"

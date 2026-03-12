@@ -1,0 +1,23 @@
+services:
+  cnb-app:
+    build: .
+    container_name: cnb_exchange_service
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persistent SQLite database
+      - cnb_data:/app/data
+      # Mount config so you can edit it without rebuilding
+      - ./config.yaml:/app/config.yaml
+    environment:
+      - CNB_CONFIG=/app/config.yaml
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  cnb_data:

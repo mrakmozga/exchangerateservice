@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CNB Exchange Rate Service</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:        #0d0f12;
+    --surface:   #141720;
+    --border:    #232738;
+    --border2:   #2e3347;
+    --accent:    #4fc3f7;
+    --accent2:   #81d4fa;
+    --green:     #69f0ae;
+    --red:       #ff5252;
+    --yellow:    #ffd740;
+    --text:      #e8eaf0;
+    --muted:     #8b92a8;
+    --mono:      'IBM Plex Mono', monospace;
+    --sans:      'IBM Plex Sans', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: .35;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 1000px; margin: 0 auto; padding: 32px 24px 80px; }
+
+  header {
+    border-bottom: 1px solid var(--border2);
+    padding-bottom: 24px;
+    margin-bottom: 36px;
+    display: flex;
+    align-items: flex-end;
+    gap: 20px;
+  }
+  .logo-block { display: flex; align-items: center; gap: 12px; }
+  .logo-icon {
+    width: 42px; height: 42px;
+    border: 2px solid var(--accent);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 13px; font-weight: 600;
+    color: var(--accent); letter-spacing: -1px; flex-shrink: 0;
+  }
+  h1 { font-family: var(--mono); font-size: 20px; font-weight: 600; color: var(--text); letter-spacing: -0.5px; }
+  .subtitle { font-size: 12px; color: var(--muted); margin-top: 3px; font-family: var(--mono); }
+
+  .status-pill {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 7px;
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    border: 1px solid var(--border2);
+    border-radius: 20px;
+    padding: 5px 12px;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  .section-label {
+    font-family: var(--mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 2px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border2); }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 20px 22px;
+    margin-bottom: 20px;
+  }
+  .card-title {
+    font-family: var(--mono); font-size: 13px; font-weight: 600;
+    color: var(--accent); margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card-title svg { opacity: .8; }
+
+  /* ── SYNC STATUS BAR ── */
+  .sync-status-bar {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 20px;
+    padding: 12px 16px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 16px;
+    font-family: var(--mono); font-size: 12px;
+  }
+  .sync-status-item { display: flex; flex-direction: column; gap: 3px; }
+  .sync-status-label { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+  .sync-status-value { color: var(--text); }
+  .sync-status-value.never { color: var(--muted); font-style: italic; }
+
+  /* ── SCHEDULE EDITOR ── */
+  .schedule-row {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin-top: 14px; padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .schedule-label {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    white-space: nowrap;
+  }
+  .time-input {
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--mono); font-size: 13px;
+    padding: 6px 10px;
+    outline: none;
+    transition: border-color .15s;
+    width: 70px;
+    text-align: center;
+  }
+  .time-input:focus { border-color: var(--accent); }
+  .time-sep { font-family: var(--mono); font-size: 16px; color: var(--muted); }
+
+  .field-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field.grow { flex: 1; min-width: 140px; }
+  label { font-size: 11px; color: var(--muted); font-family: var(--mono); letter-spacing: .5px; }
+
+  input[type=date], input[type=text], select {
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--mono); font-size: 13px;
+    padding: 7px 10px;
+    outline: none;
+    transition: border-color .15s;
+    width: 100%;
+  }
+  input[type=date]:focus, input[type=text]:focus, select:focus { border-color: var(--accent); }
+  input[type=date]::-webkit-calendar-picker-indicator { filter: invert(.6); cursor: pointer; }
+
+  .currency-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .cur-chip {
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    padding: 4px 10px; border-radius: 3px;
+    border: 1px solid var(--border2);
+    background: transparent; color: var(--muted);
+    cursor: pointer; transition: all .12s; user-select: none;
+  }
+  .cur-chip.active { border-color: var(--accent); color: var(--accent); background: rgba(79,195,247,.08); }
+  .cur-chip:hover:not(.active) { border-color: var(--border2); color: var(--text); }
+
+  .btn {
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    letter-spacing: .5px; padding: 8px 18px;
+    border-radius: 4px; border: 1px solid;
+    cursor: pointer; transition: all .12s;
+    display: inline-flex; align-items: center; gap: 6px;
+    white-space: nowrap;
+  }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #0a0e14; }
+  .btn-primary:hover { background: var(--accent2); border-color: var(--accent2); }
+  .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-ghost { background: transparent; border-color: var(--border2); color: var(--muted); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm { padding: 5px 12px; font-size: 11px; }
+
+  .spinner {
+    width: 13px; height: 13px;
+    border: 2px solid rgba(10,14,20,.3);
+    border-top-color: #0a0e14;
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+    display: none;
+  }
+  .loading .spinner { display: block; }
+  .loading .btn-text { display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #toast {
+    position: fixed; bottom: 28px; right: 28px;
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 6px; padding: 12px 18px;
+    font-family: var(--mono); font-size: 12px;
+    display: flex; align-items: center; gap: 10px;
+    opacity: 0; transform: translateY(8px);
+    transition: all .2s; pointer-events: none;
+    z-index: 999; max-width: 340px;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  #toast.ok  { border-color: var(--green); color: var(--green); }
+  #toast.err { border-color: var(--red);   color: var(--red); }
+  #toast.inf { border-color: var(--accent); color: var(--accent); }
+
+  .result-block { margin-top: 20px; }
+  .result-meta {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    margin-bottom: 10px; display: flex; gap: 16px; flex-wrap: wrap;
+  }
+  .result-meta span b { color: var(--text); }
+
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    font-family: var(--mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--muted); padding: 8px 12px; text-align: left;
+    border-bottom: 1px solid var(--border2);
+  }
+  td {
+    font-family: var(--mono); font-size: 13px;
+    padding: 10px 12px; border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(79,195,247,.03); }
+
+  .cur-badge {
+    display: inline-block;
+    background: rgba(79,195,247,.1); border: 1px solid rgba(79,195,247,.3);
+    border-radius: 3px; padding: 2px 7px;
+    font-size: 12px; font-weight: 600; color: var(--accent); letter-spacing: .5px;
+  }
+  .val-min { color: var(--green); }
+  .val-max { color: var(--red); }
+  .val-avg { color: var(--yellow); }
+
+  .missing-block {
+    margin-top: 12px; padding: 10px 14px;
+    border: 1px solid rgba(255,82,82,.25); border-radius: 4px;
+    background: rgba(255,82,82,.04);
+    font-family: var(--mono); font-size: 12px; color: var(--red);
+  }
+
+  .log-panel {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 12px 14px;
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    max-height: 120px; overflow-y: auto; margin-top: 12px; display: none;
+  }
+  .log-panel.visible { display: block; }
+  .log-line { line-height: 1.7; }
+  .log-line.ok  { color: var(--green); }
+  .log-line.err { color: var(--red); }
+  .log-line.inf { color: var(--accent); }
+
+  @media (max-width: 600px) {
+    header { flex-direction: column; align-items: flex-start; }
+    .status-pill { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo-block">
+      <div class="logo-icon">ČNB</div>
+      <div>
+        <h1>Exchange Rate Service</h1>
+        <div class="subtitle">Czech National Bank · FX Data Sync & Reports</div>
+      </div>
+    </div>
+    <div class="status-pill">
+      <div class="dot" id="health-dot"></div>
+      <span id="health-text">проверка...</span>
+    </div>
+  </header>
+
+  <!-- ── СИНХРОНИЗАЦИЯ ── -->
+  <div class="section-label">Синхронизация</div>
+
+  <!-- Синхронизация за день -->
+  <div class="card">
+    <div class="card-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+      Синхронизация за сегодня
+    </div>
+
+    <!-- Статус последней синхронизации -->
+    <div class="sync-status-bar">
+      <div class="sync-status-item">
+        <div class="sync-status-label">Последняя синхронизация</div>
+        <div class="sync-status-value" id="last-sync-time">—</div>
+      </div>
+      <div class="sync-status-item">
+        <div class="sync-status-label">Сохранено записей</div>
+        <div class="sync-status-value" id="last-sync-rows">—</div>
+      </div>
+      <div class="sync-status-item">
+        <div class="sync-status-label">Следующий запуск</div>
+        <div class="sync-status-value" id="next-sync-time">—</div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <label style="display:block;margin-bottom:8px;">Валюты</label>
+      <div class="currency-grid" id="daily-chips"></div>
+    </div>
+
+    <div style="display:flex; align-items:center; gap:12px;">
+      <button class="btn btn-primary" id="btn-daily" onclick="runDailySync()">
+        <div class="spinner"></div>
+        <span class="btn-text">Запустить</span>
+      </button>
+    </div>
+    <div class="log-panel" id="log-daily"></div>
+
+    <!-- Настройка расписания -->
+    <div class="schedule-row">
+      <span class="schedule-label">Ежедневная синхронизация в:</span>
+      <input class="time-input" type="number" id="sched-hour" min="0" max="23" placeholder="00" />
+      <span class="time-sep">:</span>
+      <input class="time-input" type="number" id="sched-minute" min="0" max="59" placeholder="01" />
+      <button class="btn btn-ghost btn-sm" id="btn-schedule" onclick="saveSchedule()">
+        <div class="spinner"></div>
+        <span class="btn-text">Сохранить</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Синхронизация за период -->
+  <div class="card">
+    <div class="card-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Синхронизация за период
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <label style="display:block;margin-bottom:8px;">Валюты</label>
+      <div class="currency-grid" id="range-chips"></div>
+    </div>
+
+    <div class="field-row" style="align-items:flex-end;">
+      <div class="field grow">
+        <label>Начальная дата</label>
+        <input type="date" id="range-start" />
+      </div>
+      <div class="field grow">
+        <label>Конечная дата</label>
+        <input type="date" id="range-end" />
+      </div>
+      <button class="btn btn-primary" id="btn-range" onclick="runRangeSync()">
+        <div class="spinner"></div>
+        <span class="btn-text">Запустить</span>
+      </button>
+    </div>
+    <div class="log-panel" id="log-range"></div>
+  </div>
+
+  <!-- ── ОТЧЁТ ── -->
+  <div class="section-label" style="margin-top:12px;">Отчёт</div>
+
+  <div class="card">
+    <div class="card-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Отчёт: Мин / Макс / Среднее
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <label style="display:block;margin-bottom:8px;">Валюты</label>
+      <div class="currency-grid" id="report-chips"></div>
+    </div>
+
+    <div class="field-row" style="align-items:flex-end;">
+      <div class="field grow">
+        <label>Начальная дата</label>
+        <input type="date" id="report-start" />
+      </div>
+      <div class="field grow">
+        <label>Конечная дата</label>
+        <input type="date" id="report-end" />
+      </div>
+      <button class="btn btn-primary" id="btn-report" onclick="runReport()">
+        <div class="spinner"></div>
+        <span class="btn-text">Получить отчёт</span>
+      </button>
+    </div>
+
+    <div class="result-block" id="report-result" style="display:none;"></div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+const ALL_CURRENCIES = ['USD','EUR','GBP','JPY','CHF','RUB','AUD','CAD','DKK','NOK','SEK','PLN','HUF','CZK'];
+const DEFAULT_SELECTED = ['USD','EUR','GBP','JPY','CHF','RUB'];
+
+const state = {
+  daily:  new Set(DEFAULT_SELECTED),
+  range:  new Set(DEFAULT_SELECTED),
+  report: new Set(DEFAULT_SELECTED),
+};
+
+function buildChips(containerId, stateKey) {
+  const el = document.getElementById(containerId);
+  ALL_CURRENCIES.forEach(c => {
+    const chip = document.createElement('div');
+    chip.className = 'cur-chip' + (state[stateKey].has(c) ? ' active' : '');
+    chip.textContent = c;
+    chip.onclick = () => {
+      if (state[stateKey].has(c)) { state[stateKey].delete(c); chip.classList.remove('active'); }
+      else                         { state[stateKey].add(c);    chip.classList.add('active'); }
+    };
+    el.appendChild(chip);
+  });
+}
+
+function setDefaults() {
+  const today    = new Date().toISOString().slice(0,10);
+  const yearAgo  = new Date(Date.now() - 365*86400000).toISOString().slice(0,10);
+  const monthAgo = new Date(Date.now() - 30*86400000).toISOString().slice(0,10);
+  document.getElementById('range-start').value  = yearAgo;
+  document.getElementById('range-end').value    = today;
+  document.getElementById('report-start').value = monthAgo;
+  document.getElementById('report-end').value   = today;
+}
+
+// ── Health check ──
+async function checkHealth() {
+  try {
+    const r = await fetch('/health');
+    const ok = r.ok;
+    document.getElementById('health-dot').className   = 'dot ' + (ok ? 'online' : '');
+    document.getElementById('health-text').textContent = ok ? 'сервис онлайн' : 'сервис недоступен';
+  } catch {
+    document.getElementById('health-dot').className   = 'dot';
+    document.getElementById('health-text').textContent = 'нет соединения';
+  }
+}
+
+// ── Sync status ──
+async function loadSyncStatus() {
+  try {
+    const s = await apiFetch('/sync/status');
+
+    // Last sync time
+    const timeEl = document.getElementById('last-sync-time');
+    if (s.last_sync_time) {
+      const d = new Date(s.last_sync_time);
+      timeEl.textContent = d.toLocaleString('ru-RU');
+      timeEl.classList.remove('never');
+    } else {
+      timeEl.textContent = 'не выполнялась';
+      timeEl.classList.add('never');
+    }
+
+    // Last sync rows
+    const rowsEl = document.getElementById('last-sync-rows');
+    rowsEl.textContent = s.last_sync_rows !== null ? s.last_sync_rows : '—';
+
+    // Next scheduled run
+    const nextEl = document.getElementById('next-sync-time');
+    const now = new Date();
+    const next = new Date();
+    next.setHours(s.schedule_hour, s.schedule_minute, 0, 0);
+    if (next <= now) next.setDate(next.getDate() + 1);
+    nextEl.textContent = next.toLocaleString('ru-RU');
+
+    // Fill schedule inputs
+    document.getElementById('sched-hour').value   = String(s.schedule_hour).padStart(2, '0');
+    document.getElementById('sched-minute').value = String(s.schedule_minute).padStart(2, '0');
+  } catch(e) {
+    console.warn('Status load failed', e);
+  }
+}
+
+
+// ── Toast ──
+let toastTimer;
+function toast(msg, type='inf') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+// ── Log ──
+function logMsg(panelId, msg, type='inf') {
+  const el = document.getElementById(panelId);
+  el.classList.add('visible');
+  const line = document.createElement('div');
+  line.className = 'log-line ' + type;
+  line.textContent = '[' + new Date().toLocaleTimeString('ru-RU') + '] ' + msg;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+function clearLog(panelId) {
+  const el = document.getElementById(panelId);
+  el.innerHTML = '';
+  el.classList.add('visible');
+}
+
+function setLoading(btnId, on) {
+  const btn = document.getElementById(btnId);
+  btn.disabled = on;
+  if (on) btn.classList.add('loading');
+  else    btn.classList.remove('loading');
+}
+
+async function apiFetch(url, opts={}) {
+  const r = await fetch(url, opts);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
+  return data;
+}
+
+// ── Daily sync ──
+async function runDailySync() {
+  const currencies = [...state.daily];
+  if (!currencies.length) { toast('Выберите хотя бы одну валюту', 'err'); return; }
+  setLoading('btn-daily', true);
+  clearLog('log-daily');
+  logMsg('log-daily', `Синхронизация ${currencies.join(', ')} за сегодня…`);
+  try {
+    const res = await apiFetch('/sync/daily', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ currencies }),
+    });
+    logMsg('log-daily', `✓ Сохранено ${res.rows_saved} записей за ${res.date}`, 'ok');
+    toast(`Синхронизация завершена — сохранено ${res.rows_saved} записей`, 'ok');
+    loadSyncStatus();
+  } catch(e) {
+    logMsg('log-daily', '✗ ' + e.message, 'err');
+    toast('Ошибка синхронизации: ' + e.message, 'err');
+  }
+  setLoading('btn-daily', false);
+}
+
+// ── Schedule save ──
+async function saveSchedule() {
+  const h = parseInt(document.getElementById('sched-hour').value);
+  const m = parseInt(document.getElementById('sched-minute').value);
+  if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) {
+    toast('Некорректное время. Часы: 0–23, минуты: 0–59', 'err');
+    return;
+  }
+  setLoading('btn-schedule', true);
+  try {
+    await apiFetch('/sync/schedule', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ hour: h, minute: m }),
+    });
+    toast(`Расписание сохранено: ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')} (МСК)`, 'ok');
+    loadSyncStatus();
+  } catch(e) {
+    toast('Ошибка: ' + e.message, 'err');
+  }
+  setLoading('btn-schedule', false);
+}
+
+// ── Range sync ──
+async function runRangeSync() {
+  const currencies = [...state.range];
+  if (!currencies.length) { toast('Выберите хотя бы одну валюту', 'err'); return; }
+  const s = document.getElementById('range-start').value;
+  const e = document.getElementById('range-end').value;
+  if (!s || !e) { toast('Укажите начальную и конечную дату', 'err'); return; }
+  setLoading('btn-range', true);
+  clearLog('log-range');
+  logMsg('log-range', `Синхронизация ${currencies.join(', ')} с ${s} по ${e}…`);
+  logMsg('log-range', 'Для длинных периодов это может занять некоторое время…');
+  try {
+    const res = await apiFetch('/sync/range', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ start_date: s, end_date: e, currencies }),
+    });
+    logMsg('log-range', `✓ Сохранено ${res.rows_saved} записей (${s} → ${e})`, 'ok');
+    toast(`Синхронизация завершена — сохранено ${res.rows_saved} записей`, 'ok');
+  } catch(e) {
+    logMsg('log-range', '✗ ' + e.message, 'err');
+    toast('Ошибка синхронизации: ' + e.message, 'err');
+  }
+  setLoading('btn-range', false);
+}
+
+// ── Report ──
+async function runReport() {
+  const currencies = [...state.report];
+  if (!currencies.length) { toast('Выберите хотя бы одну валюту', 'err'); return; }
+  const s = document.getElementById('report-start').value;
+  const e = document.getElementById('report-end').value;
+  if (!s || !e) { toast('Укажите начальную и конечную дату', 'err'); return; }
+  setLoading('btn-report', true);
+  const resultEl = document.getElementById('report-result');
+  resultEl.style.display = 'none';
+  try {
+    const params = new URLSearchParams({ start_date: s, end_date: e });
+    currencies.forEach(c => params.append('currencies', c));
+    const res = await apiFetch('/report?' + params);
+    renderReport(res, resultEl);
+    resultEl.style.display = 'block';
+    toast('Отчёт готов', 'ok');
+  } catch(e) {
+    toast('Ошибка отчёта: ' + e.message, 'err');
+  }
+  setLoading('btn-report', false);
+}
+
+function renderReport(data, el) {
+  const dp = data.results.reduce((s,r) => s + r.data_points, 0);
+  let html = `
+    <div class="result-meta">
+      <span>Период: <b>${data.start_date} → ${data.end_date}</b></span>
+      <span>Валют: <b>${data.results.length}</b></span>
+      <span>Записей: <b>${dp}</b></span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Валюта</th>
+          <th>Мин (CZK)</th>
+          <th>Макс (CZK)</th>
+          <th>Среднее (CZK)</th>
+          <th>Дней</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+  if (data.results.length === 0) {
+    html += `<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:20px;">Нет данных в базе за этот период. Сначала запустите синхронизацию.</td></tr>`;
+  } else {
+    data.results.forEach(r => {
+      html += `
+        <tr>
+          <td><span class="cur-badge">${r.currency}</span></td>
+          <td class="val-min">${r.min_rate.toFixed(4)}</td>
+          <td class="val-max">${r.max_rate.toFixed(4)}</td>
+          <td class="val-avg">${r.avg_rate.toFixed(4)}</td>
+          <td style="color:var(--muted)">${r.data_points}</td>
+        </tr>
+      `;
+    });
+  }
+  html += '</tbody></table>';
+  if (data.missing && data.missing.length) {
+    html += `<div class="missing-block">⚠ Нет данных для: ${data.missing.join(', ')}</div>`;
+  }
+  el.innerHTML = html;
+}
+
+// ── Boot ──
+buildChips('daily-chips',  'daily');
+buildChips('range-chips',  'range');
+buildChips('report-chips', 'report');
+setDefaults();
+checkHealth();
+loadSyncStatus();
+setInterval(checkHealth, 30000);
+setInterval(loadSyncStatus, 60000);
+</script>
+</body>
+</html>
