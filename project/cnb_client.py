@@ -159,7 +159,7 @@ def fetch_year(year: int, currencies: list[str], base_url: str = YEAR_URL) -> li
 def fetch_range(start: date, end: date, currencies: list[str],
                 daily_url: str = DAILY_URL, year_url: str = YEAR_URL) -> list[dict]:
     """Загружает курсы за произвольный диапазон дат с оптимизацией запросов.
-    Стратегия: если год полностью входит в диапазон — один запрос к year.txt.
+    Если год полностью входит в диапазон — один запрос к year.txt.
     Если год входит частично (начало или конец диапазона) — итерация по дням через daily.txt.
     Пример: запрос с 15.03.2023 по 20.06.2024 сделает:
       - daily.txt для 15.03–31.12.2023 (частичный год)
